@@ -10,7 +10,7 @@ import tempfile
 import threading
 import time
 from datetime import datetime, timedelta
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from flask import Flask
 from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -856,65 +856,33 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 
 # Servidor HTTP para responder a pings de UptimeRobot/Render
-class HealthCheckHandler(BaseHTTPRequestHandler):
-    """Manejador HTTP que responde a health checks."""
-    
-    def do_GET(self):
-        """Responde con 200 OK a cualquier GET."""
-        try:
-            # Enviar respuesta HTTP 200
-            self.send_response(200)
-            self.send_header("Content-type", "text/plain; charset=utf-8")
-            self.send_header("Connection", "close")
-            
-            # Contenido de respuesta
-            response = b"Bot is running"
-            self.send_header("Content-Length", str(len(response)))
-            self.end_headers()
-            
-            # Escribir cuerpo
-            self.wfile.write(response)
-            self.wfile.flush()
-            
-            logger.info(f"✅ Health check OK from {self.client_address[0]}")
-        except Exception as e:
-            logger.error(f"❌ Error en health check: {e}")
-            try:
-                self.send_error(500, str(e))
-            except:
-                pass
-    
-    def do_POST(self):
-        """También responder a POST."""
-        self.do_GET()
-    
-    def log_message(self, format, *args):
-        """Silencia logs HTTP estándar (evita ruido)."""
-        pass
+# Crear aplicación Flask para health checks
+flask_app = Flask(__name__)
+
+@flask_app.route('/', methods=['GET', 'POST'])
+def health_check():
+    """Responde health checks."""
+    logger.info("✅ Health check from UptimeRobot")
+    return "Bot is running", 200
 
 
 def start_health_server():
-    """Inicia servidor HTTP en un thread separado."""
-    max_retries = 3
-    retry_count = 0
-    
-    while retry_count < max_retries:
-        try:
-            server = HTTPServer(("0.0.0.0", PORT), HealthCheckHandler)
-            server.timeout = 5
-            logger.info(f"🌐 Servidor HTTP escuchando en puerto {PORT}")
-            server.serve_forever()
-            return
-        except OSError as e:
-            retry_count += 1
-            logger.warning(f"⚠️  Error al iniciar servidor (intento {retry_count}/{max_retries}): {e}")
-            if retry_count < max_retries:
-                time.sleep(2)
-            else:
-                logger.error(f"❌ No se pudo iniciar servidor HTTP después de {max_retries} intentos")
-        except Exception as e:
-            logger.error(f"❌ Error inesperado en servidor HTTP: {e}")
-            return
+    """Inicia servidor Flask en un thread separado."""
+    try:
+        logger.info(f"🌐 Iniciando Flask server en puerto {PORT}")
+        # Desactivar logs de Flask (muy verbosos)
+        flask_log = logging.getLogger('werkzeug')
+        flask_log.setLevel(logging.ERROR)
+        
+        flask_app.run(
+            host='0.0.0.0',
+            port=PORT,
+            debug=False,
+            use_reloader=False,
+            threaded=True
+        )
+    except Exception as e:
+        logger.error(f"❌ Error en Flask server: {e}", exc_info=True)
 
 
 # ============================================================================
@@ -977,6 +945,9 @@ def main() -> None:
     application.add_error_handler(error_handler)
 
     # Iniciar
+    logger.warning(f"🔍 [MODE CHECK] MODE_NUBE={MODE_NUBE}")
+    logger.warning(f"🔍 [WEBHOOK_URL] {WEBHOOK_URL}")
+    
     if MODE_NUBE:
         logger.info("☁️  Iniciando en modo NUBE (webhooks)")
         logger.info(f"📡 Webhook URL: {WEBHOOK_URL}")
@@ -988,19 +959,28 @@ def main() -> None:
             webhook_url=f"{WEBHOOK_URL}/{TOKEN}",
         )
     else:
+        logger.warning("🔍 [ENTERING LOCAL MODE]")
         logger.info("💻 Iniciando en modo LOCAL (polling)")
         logger.info("🤖 Bot iniciado. Presiona Ctrl+C para detener.")
         logger.info(f"📊 Almacenamiento: Excel local + {'Google Drive ☁️' if USE_GOOGLE_DRIVE else 'Local only'}")
         
+        logger.warning("🚀 [CREATING HTTP THREAD]")
         # Iniciar servidor HTTP en thread separado para UptimeRobot/Render
         # DEBE SER DAEMON PERO INICIARSE ANTES DEL POLLING
         health_thread = threading.Thread(target=start_health_server, daemon=True)
+        logger.warning(f"🔍 [HTTP THREAD OBJECT] {health_thread}")
+        
+        logger.warning("🚀 [STARTING HTTP THREAD]")
         health_thread.start()
+        logger.warning(f"✅ [HTTP THREAD STARTED] is_alive={health_thread.is_alive()}")
         logger.info("✅ Health check server iniciado (responde a UptimeRobot)")
         
+        logger.warning("⏳ [SLEEP] Esperando 0.5 segundos para que Flask esté listo...")
         # Pequeña pausa para asegurar que el servidor está listo
-        time.sleep(1)
+        time.sleep(0.5)
+        logger.warning(f"✅ [AFTER SLEEP] HTTP thread alive={health_thread.is_alive()}")
         
+        logger.warning("🚀 [STARTING POLLING]")
         # Ahora sí iniciar el polling de Telegram
         application.run_polling(allowed_updates=Update.ALL_TYPES)
 
