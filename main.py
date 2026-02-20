@@ -7,7 +7,9 @@ Compatible con LOCAL (polling) y NUBE (webhooks).
 import logging
 import os
 import tempfile
+import threading
 from datetime import datetime, timedelta
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -42,6 +44,7 @@ USE_GOOGLE_DRIVE = os.getenv("USE_GOOGLE_DRIVE", "false").lower() == "true"
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 WEBHOOK_PORT = int(os.getenv("WEBHOOK_PORT", "8443"))
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "tu_secret")
+PORT = int(os.getenv("PORT", "10000"))  # Puerto que Render asigna
 
 MODE_NUBE = WEBHOOK_URL is not None
 
@@ -851,6 +854,36 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
 
 
+# Servidor HTTP para responder a pings de UptimeRobot/Render
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    """Manejador HTTP que responde a health checks."""
+    
+    def do_GET(self):
+        """Responde con 200 OK a cualquier GET."""
+        try:
+            self.send_response(200)
+            self.send_header("Content-type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"Bot is running")
+            logger.info(f"✅ Health check from {self.client_address[0]}")
+        except Exception as e:
+            logger.error(f"❌ Error en health check: {e}")
+    
+    def log_message(self, format, *args):
+        """Silencia logs HTTP estándar."""
+        pass
+
+
+def start_health_server():
+    """Inicia servidor HTTP en un thread separado."""
+    try:
+        server = HTTPServer(("0.0.0.0", PORT), HealthCheckHandler)
+        logger.info(f"🌐 Servidor HTTP escuchando en puerto {PORT}")
+        server.serve_forever()
+    except Exception as e:
+        logger.error(f"❌ Error al iniciar servidor HTTP: {e}")
+
+
 # ============================================================================
 # FUNCIÓN PRINCIPAL
 # ============================================================================
@@ -860,7 +893,7 @@ def main() -> None:
     import asyncio
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    
+
     """Inicia el bot."""
     application = Application.builder().token(TOKEN).build()
 
@@ -925,6 +958,11 @@ def main() -> None:
         logger.info("💻 Iniciando en modo LOCAL (polling)")
         logger.info("🤖 Bot iniciado. Presiona Ctrl+C para detener.")
         logger.info(f"📊 Almacenamiento: Excel local + {'Google Drive ☁️' if USE_GOOGLE_DRIVE else 'Local only'}")
+        
+        # Iniciar servidor HTTP en thread separado para UptimeRobot/Render
+        health_thread = threading.Thread(target=start_health_server, daemon=True)
+        health_thread.start()
+        logger.info("✅ Health check server iniciado (responde a UptimeRobot)")
         
         application.run_polling(allowed_updates=Update.ALL_TYPES)
 
