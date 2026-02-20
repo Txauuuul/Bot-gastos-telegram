@@ -1,0 +1,202 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║              🚀 SUBIR A GITHUB Y DESPLEGAR EN RENDER (Mega Simple)          ║
+║                                                                              ║
+║                          Paso a paso - 30 minutos                           ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+✅ ARCHIVOS YA ESTÁN LISTOS:
+   • Procfile ✅
+   • requirements.txt ✅ (limpio y sin duplicados)
+   • .gitignore ✅
+   • main.py, spreadsheet_manager.py, etc. ✅
+
+═══════════════════════════════════════════════════════════════════════════════
+PASO 1: CREAR REPOSITORIO EN GITHUB (5 minutos)
+═══════════════════════════════════════════════════════════════════════════════
+
+1. Ve a: https://github.com/new
+
+2. Llena:
+   Repository name: bot-gastos-telegram
+   Description: Bot Telegram para gestión de gastos
+   Public/Private: Como prefieras
+   ☐ Add a README
+   ☐ Add .gitignore (python)
+
+3. Click: "Create repository"
+
+4. GitHub te muestra:
+   https://github.com/TU_USUARIO/bot-gastos-telegram
+   
+   ⭐ COPIA ESTA URL
+
+
+═══════════════════════════════════════════════════════════════════════════════
+PASO 2: SUBIR TU CÓDIGO A GITHUB (10 minutos)
+═══════════════════════════════════════════════════════════════════════════════
+
+1. Abre: Terminal/PowerShell en tu PC
+   (En VS Code: Ctrl + `)
+
+2. Ve a tu carpeta:
+   cd c:\Users\User\Pop
+
+3. Ejecuta estos comandos (1 por 1, ENTER después de cada uno):
+
+   ┌─────────────────────────────────────────────────────┐
+   │ git config --global user.name "Tu Nombre"           │
+   │ git config --global user.email "tu@email.com"       │
+   │ git init                                            │
+   │ git remote add origin https://github.com/TU_USUARIO/bot-gastos-telegram
+   │ git add .                                           │
+   │ git commit -m "Versión inicial del bot"             │
+   │ git push -u origin main                             │
+   └─────────────────────────────────────────────────────┘
+
+   NOTAS:
+   • Reemplaza TU_USUARIO con tu usuario real
+   • Reemplaza "Tu Nombre" y "tu@email.com" con tus datos
+   • Si GitHub te pide autenticación, autoriza en el navegador
+
+4. Verifica en: https://github.com/TU_USUARIO/bot-gastos-telegram
+   Deberías ver tu código (SIN .env, SIN token.json ✅)
+
+
+═══════════════════════════════════════════════════════════════════════════════
+PASO 3: DESPLEGAR EN RENDER (10 minutos)
+═══════════════════════════════════════════════════════════════════════════════
+
+1. Ve a: https://dashboard.render.com
+
+2. Click: "+ New" → "Web Service"
+
+3. Click: "GitHub" (conectar GitHub)
+   • Autoriza Render en GitHub si te lo pide
+
+4. Selecciona: "bot-gastos-telegram"
+
+5. Llena el formulario:
+   
+   Name:           bot-gastos
+   Root Directory: (vacío)
+   Environment:    Python 3
+   Build Command:  pip install -r requirements.txt
+   Start Command:  python main.py
+   
+   Plan: Free
+
+6. Scroll down, busca "Environment"
+   
+   Click: "Add Environment Variable"
+   
+   Agrega:
+   KEY:   TELEGRAM_BOT_TOKEN
+   VALUE: [Your token from .env]
+   
+   (Copia tu token de tu archivo .env local)
+
+7. Click: "Create Web Service"
+
+8. Espera 2-3 minutos. Render mostrará logs.
+   
+   Cuando veas: "[INFO] Bot iniciado" → ¡Funciona!
+
+9. Obtén tu URL:
+   Render Dashboard → tu servicio → "Settings"
+   Busca: "Render URL"
+   
+   Ejemplo: https://bot-gastos.onrender.com
+
+
+═══════════════════════════════════════════════════════════════════════════════
+PASO 4: VERIFICAR QUE FUNCIONA (5 minutos)
+═══════════════════════════════════════════════════════════════════════════════
+
+1. Abre Telegram
+
+2. Busca tu bot
+
+3. Escribe: /ayuda
+
+4. Si responde ✅ → ¡FUNCIONA!
+
+5. Espera 16 minutos sin escribir
+
+6. Escribe: /estado
+
+   Si responde en 1-2 segundos ✅ Bot está OK
+   Si tarda 30+ segundos → Falta keep-alive (opcional)
+
+
+═══════════════════════════════════════════════════════════════════════════════
+(OPCIONAL) PASO 5: KEEP-ALIVE (para que nunca se pause)
+═══════════════════════════════════════════════════════════════════════════════
+
+Si en el paso 4, el bot tarda 30+ segundos en responder tras 15 min de inactividad:
+
+1. Ve a: https://uptimerobot.com
+
+2. Click: "+ Add Monitor"
+
+3. Configura:
+   Type:         HTTP(s)
+   URL:          https://tu-app.onrender.com
+   Interval:     5 minutes
+   
+4. Click: "Create Monitor"
+
+Listo. Ahora Render NO se pausa nunca.
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🔄 ACTUALIZAR EL BOT EN FUTURO
+═══════════════════════════════════════════════════════════════════════════════
+
+Si quieres cambiar tu código:
+1. Edita en tu PC
+2. Terminal:
+   cd c:\Users\User\Pop
+   git add .
+   git commit -m "Descripción del cambio"
+   git push
+
+Render se redeploya automáticamente en 2-3 minutos.
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🆘 ERRORES COMUNES
+═══════════════════════════════════════════════════════════════════════════════
+
+"fatal: not a git repository"
+→ Verifica que estés en c:\Users\User\Pop
+→ Ejecuta: git init
+
+"Module not found"
+→ Ese módulo falta en requirements.txt
+→ Agrégalo, haz git push
+
+"TELEGRAM_BOT_TOKEN not found"
+→ No agregaste en Environment de Render
+→ Ve a tu servicio, agrega la variable
+
+Bot no responde en Telegram
+→ Ve a Render, abre "Logs"
+→ Busca el error en rojo
+→ Arregla en tu código, haz git push
+
+
+═══════════════════════════════════════════════════════════════════════════════
+✅ RESUMEN FINAL
+═══════════════════════════════════════════════════════════════════════════════
+
+Todo listo para:
+  1. GitHub: Tu código en backup seguro ✅
+  2. Render: Bot 24/7 sin tu PC ✅
+  3. Keep-Alive: Nunca se pausa (opcional) ✅
+
+Total: ~30 minutos
+Costo: GRATIS
+
+═══════════════════════════════════════════════════════════════════════════════

@@ -1,0 +1,53 @@
+# Variables de entorno sensibles
+.env
+.env.local
+token.json
+
+# Credenciales y claves (NUNCA subír a GitHub)
+credentials.json
+google-vision-key.json
+
+# Datos generados
+gastos.xlsx
+*.xlsx
+config.json
+categorias.json
+historial_borrados.json
+
+# Cache de Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Entorno virtual
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-workspace
+*.sublime-project
+
+# OS
+.DS_Store
+Thumbs.db
+.AppleDouble
+.LSOverride
+
+# Testing
+.pytest_cache/
+.coverage
+
+# IDE específicos
+*.code-workspace
