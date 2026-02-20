@@ -7,6 +7,7 @@ Incluye análisis, reportes, búsqueda y gestión inteligente.
 import os
 import json
 import logging
+from io import BytesIO
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Dict, Tuple
@@ -22,7 +23,7 @@ try:
     from google.oauth2.credentials import Credentials
     from google_auth_oauthlib.flow import InstalledAppFlow
     from googleapiclient.discovery import build
-    from googleapiclient.http import MediaFileUpload
+    from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 except ImportError:
     pass
 
@@ -56,6 +57,8 @@ class SpreadsheetManager:
 
         if use_google_drive:
             self._init_google_drive()
+            # Descargar Excel desde Google Drive al iniciar (recupera gastos tras redeploy)
+            self._descargar_excel_del_google_drive()
 
     def _cargar_config(self) -> Dict:
         """Carga la configuración desde archivo JSON."""
@@ -239,18 +242,48 @@ class SpreadsheetManager:
             logger.error(f"❌ Error al agregar gasto: {e}")
             return False
 
+    def _descargar_excel_del_google_drive(self) -> bool:
+        """Descarga el Excel desde Google Drive al iniciar (recupera gastos tras redeploy)."""
+        try:
+            if not self.drive_service:
+                logger.warning("Google Drive no está configurado para descargar")
+                return False
+
+            query = f"name='{self.LOCAL_FILE}' and trashed=false"
+            results = self.drive_service.files().list(q=query, spaces="drive", pageSize=1).execute()
+            files = results.get("files", [])
+
+            if not files:
+                logger.info(f"📄 No hay {self.LOCAL_FILE} en Google Drive (primera vez)")
+                return False
+
+            file_id = files[0]["id"]
+            request = self.drive_service.files().get_media(fileId=file_id)
+            
+            fh = BytesIO()
+            downloader = MediaIoBaseDownload(fh, request)
+
+            done = False
+            while not done:
+                status, done = downloader.next_chunk()
+
+            fh.seek(0)
+            with open(self.LOCAL_FILE, 'wb') as f:
+                f.write(fh.read())
+
+            logger.info(f"☁️  Excel descargado desde Google Drive (recuperado tras redeploy)")
+            return True
+
+        except Exception as e:
+            logger.error(f"❌ Error al descargar desde Google Drive: {e}")
+            return False
+
     def _sincronizar_google_drive(self) -> bool:
-        """Carga el Excel a Google Drive cada 12 horas."""
+        """Carga el Excel a Google Drive INMEDIATAMENTE (sin esperar 12 horas)."""
         try:
             if not self.drive_service:
                 logger.warning("Google Drive no está configurado")
                 return False
-
-            ultima_sync = self.config.get("ultima_sincronizacion")
-            ahora = datetime.now().timestamp()
-            
-            if ultima_sync and (ahora - ultima_sync) < 43200:  # 12 horas = 43200 segundos
-                return True  # No sincronizar aún
 
             query = f"name='{self.LOCAL_FILE}' and trashed=false"
             results = self.drive_service.files().list(q=query, spaces="drive", pageSize=1).execute()
@@ -260,15 +293,13 @@ class SpreadsheetManager:
                 file_id = files[0]["id"]
                 media = MediaFileUpload(self.LOCAL_FILE, resumable=True)
                 self.drive_service.files().update(fileId=file_id, media_body=media).execute()
-                logger.info(f"☁️  Archivo actualizado en Google Drive")
+                logger.info(f"☁️  Excel sincronizado con Google Drive (gasto guardado)")
             else:
                 file_metadata = {"name": self.LOCAL_FILE}
                 media = MediaFileUpload(self.LOCAL_FILE, resumable=True)
                 file = self.drive_service.files().create(body=file_metadata, media_body=media).execute()
-                logger.info(f"☁️  Archivo subido a Google Drive ({file['id']})")
+                logger.info(f"☁️  Excel subido a Google Drive ({file['id']})")
 
-            self.config["ultima_sincronizacion"] = ahora
-            self._guardar_config()
             return True
 
         except Exception as e:
