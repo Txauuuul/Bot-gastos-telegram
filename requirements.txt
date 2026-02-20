@@ -4,5 +4,6 @@ openpyxl==3.1.2
 google-auth>=2.0
 google-auth-oauthlib==1.2.1
 google-auth-httplib2==0.2.0
-google-api-python-client==2.108.0flask==3.0.0
+google-api-python-client==2.108.0
+flask==3.0.0
 werkzeug==3.0.0
