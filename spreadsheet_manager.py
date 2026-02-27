@@ -144,8 +144,26 @@ class SpreadsheetManager:
             if not creds or not creds.valid:
                 if creds and creds.expired and creds.refresh_token:
                     logger.info("🔄 Token expirado, refrescando...")
-                    creds.refresh(Request())
-                    logger.info("✅ Token refrescado correctamente")
+                    try:
+                        creds.refresh(Request())
+                        logger.info("✅ Token refrescado correctamente")
+                    except Exception as refresh_error:
+                        err_str = str(refresh_error)
+                        if "invalid_grant" in err_str or "Token has been expired or revoked" in err_str:
+                            logger.error(
+                                "❌ Google Drive: token revocado permanentemente.\n"
+                                "Soluciones:\n"
+                                "  1. Borra token.json y re-autentícate localmente\n"
+                                "  2. En Render/nube: usa una Service Account (GOOGLE_SERVICE_ACCOUNT_JSON)\n"
+                                "  Ver README para instrucciones."
+                            )
+                            # Eliminar token inválido para no reintentar en cada inicio
+                            if os.path.exists("token.json"):
+                                os.remove("token.json")
+                        else:
+                            logger.error(f"❌ Error refrescando token: {refresh_error}")
+                        self.use_google_drive = False
+                        return False
                 else:
                     if not os.path.exists("credentials.json"):
                         logger.warning(
@@ -162,8 +180,9 @@ class SpreadsheetManager:
                     creds = flow.run_local_server(port=0)
 
                 # Guardar token actualizado para la próxima vez
-                with open("token.json", "w") as token:
-                    token.write(creds.to_json())
+                if creds and creds.valid:
+                    with open("token.json", "w") as token:
+                        token.write(creds.to_json())
 
             self.drive_service = build("drive", "v3", credentials=creds)
             self._creds = creds  # Guardar referencia para refrescar después
@@ -181,7 +200,17 @@ class SpreadsheetManager:
             if hasattr(self, '_creds') and self._creds:
                 if self._creds.expired and self._creds.refresh_token:
                     logger.info("🔄 Token expirado, refrescando antes de sincronizar...")
-                    self._creds.refresh(Request())
+                    try:
+                        self._creds.refresh(Request())
+                    except Exception as refresh_error:
+                        if "invalid_grant" in str(refresh_error):
+                            logger.error("❌ Token de Google Drive revocado. Deshabilitando sync.")
+                            self.use_google_drive = False
+                            self.drive_service = None
+                            if os.path.exists("token.json"):
+                                os.remove("token.json")
+                            return False
+                        raise
                     with open("token.json", "w") as token:
                         token.write(self._creds.to_json())
                     self.drive_service = build("drive", "v3", credentials=self._creds)

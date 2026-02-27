@@ -1202,11 +1202,6 @@ def start_health_server():
 # ============================================================================
 
 def main() -> None:
-
-    import asyncio
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-
     """Inicia el bot."""
     application = Application.builder().token(TOKEN).build()
 
