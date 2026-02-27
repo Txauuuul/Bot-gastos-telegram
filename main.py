@@ -39,7 +39,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Diccionario para almacenar gastos pendientes
-gastos_pendientes = {}
+# gastos_pendientes reemplazado por context.user_data (por usuario, persiste entre mensajes)
 
 # Configuración
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -279,7 +279,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await update.message.reply_text(mensaje_validacion)
         return
 
-    gastos_pendientes[user_id] = gasto_parsed
+    context.user_data["gasto_pendiente"] = gasto_parsed
 
     categorias = spreadsheet.obtener_categorias()
     buttons = []
@@ -320,11 +320,11 @@ async def categoria_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     categoria_seleccionada = query.data.replace("cat_", "")
     
-    if user_id not in gastos_pendientes:
-        await query.answer("❌ No hay gasto pendiente. Intenta de nuevo.", show_alert=True)
+    if "gasto_pendiente" not in context.user_data:
+        await query.answer("❌ No hay gasto pendiente. Escribe el gasto de nuevo (ej: Café 2.50€)", show_alert=True)
         return
     
-    gasto_parsed = gastos_pendientes[user_id]
+    gasto_parsed = context.user_data["gasto_pendiente"]
     gasto_parsed["categoria"] = categoria_seleccionada
     
     resultado_guardado = spreadsheet.agregar_gasto(gasto_parsed)
@@ -361,7 +361,7 @@ async def categoria_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 "Se reintentará en la próxima operación."
             )
         
-        del gastos_pendientes[user_id]
+        del context.user_data["gasto_pendiente"]
         
         # Alerta de presupuesto
         if not es_ingreso:
@@ -922,8 +922,8 @@ async def ingreso_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             await update.message.reply_text(mensaje_validacion)
             return
         
-        # Guardar en gastos_pendientes para que el callback de categoría lo procese
-        gastos_pendientes[user_id] = gasto_parsed
+        # Guardar en context.user_data para que el callback de categoría lo procese
+        context.user_data["gasto_pendiente"] = gasto_parsed
         
         categorias = spreadsheet.obtener_categorias()
         buttons = []

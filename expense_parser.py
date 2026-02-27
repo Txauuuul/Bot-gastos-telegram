@@ -12,15 +12,17 @@ class ExpenseParser:
     """Clase para parsear strings de gastos con formato flexible."""
 
     # Patrones regex para diferentes formatos
+    # [^0-9.,€:\-\n]+ acepta cualquier carácter excepto dígitos y separadores
+    # Esto permite ñ, tildes (á,é,í,ó,ú), espacios, apóstrofes, y nombres con múltiples palabras
     PATTERNS = [
-        # "Patatas 2.50€" o "Patatas 2.50 €" o "Patatas 2€" o "Patatas 2"
-        r"^([a-zA-Z\s]+?)\s+(\d+(?:[.,]\d{1,2})?)\s*€?$",
-        # "Patatas: 2.50€" o "Patatas: 2€" o "Patatas: 2"
-        r"^([a-zA-Z\s]+?):\s*(\d+(?:[.,]\d{1,2})?)\s*€?$",
-        # "2.50€ Patatas" o "2€ Patatas" o "2 Patatas"
-        r"^(\d+(?:[.,]\d{1,2})?)\s*€?\s+([a-zA-Z\s]+?)$",
-        # "Patatas - 2.50 €" o "Patatas - 2€" o "Patatas - 2"
-        r"^([a-zA-Z\s]+?)\s*-\s*(\d+(?:[.,]\d{1,2})?)\s*€?$",
+        # "Patatas 2.50€" o "Taco Frances 2" o "Macarrón 1.50€"
+        r"^([^0-9.,€:\-\n]+?)\s+(\d+(?:[.,]\d{1,2})?)\s*€?$",
+        # "Patatas: 2.50€" o "Café con leche: 2"
+        r"^([^0-9.,€:\-\n]+?):\s*(\d+(?:[.,]\d{1,2})?)\s*€?$",
+        # "2.50€ Patatas" o "2 Café" (precio primero)
+        r"^(\d+(?:[.,]\d{1,2})?)\s*€?\s+([^0-9.,€:\-\n]+?)$",
+        # "Patatas - 2.50 €" o "Taco Francés - 3"
+        r"^([^0-9.,€:\-\n]+?)\s*-\s*(\d+(?:[.,]\d{1,2})?)\s*€?$",
     ]
 
     # Palabras clave para detectar ingresos
