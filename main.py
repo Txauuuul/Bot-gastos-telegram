@@ -10,6 +10,7 @@ import tempfile
 import threading
 import time
 from datetime import datetime, timedelta, time as dt_time
+from pathlib import Path
 from flask import Flask
 from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -27,8 +28,8 @@ from expense_parser import ExpenseParser
 from spreadsheet_manager import SpreadsheetManager
 from ocr_processor import procesar_ticket, parseador_ticket
 
-# Cargar variables de entorno
-load_dotenv()
+# Cargar variables de entorno (siempre desde la carpeta del script, con prioridad sobre vars del sistema)
+load_dotenv(Path(__file__).parent / ".env", override=True)
 
 # Configurar logging
 logging.basicConfig(
@@ -56,7 +57,7 @@ ALLOWED_USER_IDS = (
     else set()
 )
 
-MODE_NUBE = WEBHOOK_URL is not None
+MODE_NUBE = bool(WEBHOOK_URL)
 
 if not TOKEN:
     raise ValueError(
@@ -1294,4 +1295,6 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    import asyncio
+    asyncio.set_event_loop(asyncio.new_event_loop())
     main()
