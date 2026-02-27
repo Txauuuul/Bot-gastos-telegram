@@ -21,6 +21,7 @@ except ImportError:
 try:
     from google.auth.transport.requests import Request
     from google.oauth2.credentials import Credentials
+    from google.oauth2 import service_account
     from google_auth_oauthlib.flow import InstalledAppFlow
     from googleapiclient.discovery import build
     from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
@@ -29,8 +30,9 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-# ID de carpeta en Google Drive donde guardar los archivos (opcional)
-GOOGLE_DRIVE_FOLDER_ID = None
+# ID de carpeta en Google Drive donde guardar los archivos
+# Obtén el ID de la URL de tu carpeta: drive.google.com/drive/folders/ESTE_ES_EL_ID
+GOOGLE_DRIVE_FOLDER_ID = os.getenv("GOOGLE_DRIVE_FOLDER_ID", None)
 
 
 class SpreadsheetManager:
@@ -133,14 +135,35 @@ class SpreadsheetManager:
             return False
 
     def _init_google_drive(self) -> bool:
-        """Inicializa autenticación con Google Drive."""
-        try:
-            creds = None
+        """Inicializa autenticación con Google Drive.
 
+        Soporta dos métodos:
+        1. Service Account (credentials.json con type=service_account) - para Render/nube
+        2. OAuth usuario (token.json) - para uso personal local
+        """
+        try:
+            import json as _json
+
+            # --- Método 1: Service Account (sin navegador, ideal para Render) ---
+            if os.path.exists("credentials.json"):
+                with open("credentials.json") as f:
+                    cred_data = _json.load(f)
+
+                if cred_data.get("type") == "service_account":
+                    creds = service_account.Credentials.from_service_account_file(
+                        "credentials.json", scopes=self.SCOPES
+                    )
+                    self.drive_service = build("drive", "v3", credentials=creds)
+                    self._creds = creds
+                    sa_email = cred_data.get("client_email", "")
+                    logger.info(f"✅ Google Drive autenticado con Service Account ({sa_email})")
+                    return True
+
+            # --- Método 2: OAuth usuario (token.json) ---
+            creds = None
             if os.path.exists("token.json"):
                 creds = Credentials.from_authorized_user_file("token.json", self.SCOPES)
 
-            # Si no hay credenciales válidas, intentar refrescar o crear nuevas
             if not creds or not creds.valid:
                 if creds and creds.expired and creds.refresh_token:
                     logger.info("🔄 Token expirado, refrescando...")
@@ -150,14 +173,7 @@ class SpreadsheetManager:
                     except Exception as refresh_error:
                         err_str = str(refresh_error)
                         if "invalid_grant" in err_str or "Token has been expired or revoked" in err_str:
-                            logger.error(
-                                "❌ Google Drive: token revocado permanentemente.\n"
-                                "Soluciones:\n"
-                                "  1. Borra token.json y re-autentícate localmente\n"
-                                "  2. En Render/nube: usa una Service Account (GOOGLE_SERVICE_ACCOUNT_JSON)\n"
-                                "  Ver README para instrucciones."
-                            )
-                            # Eliminar token inválido para no reintentar en cada inicio
+                            logger.error("❌ Google Drive: token revocado. Borra token.json y re-autentícate.")
                             if os.path.exists("token.json"):
                                 os.remove("token.json")
                         else:
@@ -165,28 +181,20 @@ class SpreadsheetManager:
                         self.use_google_drive = False
                         return False
                 else:
-                    if not os.path.exists("credentials.json"):
-                        logger.warning(
-                            "⚠️  credentials.json no encontrado. "
-                            "Google Drive deshabilitado. "
-                            "Guarda en local solamente."
-                        )
-                        self.use_google_drive = False
-                        return False
-
-                    flow = InstalledAppFlow.from_client_secrets_file(
-                        "credentials.json", self.SCOPES
+                    logger.warning(
+                        "⚠️  No hay credenciales válidas para Google Drive. "
+                        "Pon credentials.json (Service Account) en la carpeta del bot."
                     )
-                    creds = flow.run_local_server(port=0)
+                    self.use_google_drive = False
+                    return False
 
-                # Guardar token actualizado para la próxima vez
                 if creds and creds.valid:
                     with open("token.json", "w") as token:
                         token.write(creds.to_json())
 
             self.drive_service = build("drive", "v3", credentials=creds)
-            self._creds = creds  # Guardar referencia para refrescar después
-            logger.info("✅ Google Drive autenticado")
+            self._creds = creds
+            logger.info("✅ Google Drive autenticado (OAuth usuario)")
             return True
 
         except Exception as e:
@@ -384,6 +392,9 @@ class SpreadsheetManager:
                 logger.info(f"☁️  Excel sincronizado con Google Drive")
             else:
                 file_metadata = {"name": self.LOCAL_FILE}
+                # Si hay una carpeta configurada, subir dentro de ella
+                if GOOGLE_DRIVE_FOLDER_ID:
+                    file_metadata["parents"] = [GOOGLE_DRIVE_FOLDER_ID]
                 media = MediaFileUpload(self.LOCAL_FILE, resumable=True)
                 file = self.drive_service.files().create(body=file_metadata, media_body=media).execute()
                 logger.info(f"☁️  Excel subido a Google Drive ({file['id']})")
