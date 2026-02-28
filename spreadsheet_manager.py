@@ -153,19 +153,28 @@ class SpreadsheetManager:
             _refresh_token = os.getenv("GOOGLE_REFRESH_TOKEN")
 
             if _client_id and _client_secret and _refresh_token:
-                creds = OAuthCredentials(
-                    token=None,
-                    refresh_token=_refresh_token,
-                    token_uri="https://oauth2.googleapis.com/token",
-                    client_id=_client_id,
-                    client_secret=_client_secret,
-                    scopes=self.SCOPES,
-                )
-                creds.refresh(Request())
-                self.drive_service = build("drive", "v3", credentials=creds)
-                self._creds = creds
-                logger.info("✅ Google Drive autenticado con OAuth (variables de entorno)")
-                return True
+                logger.info("🔑 Intentando OAuth con variables de entorno...")
+                try:
+                    creds = OAuthCredentials(
+                        token=None,
+                        refresh_token=_refresh_token,
+                        token_uri="https://oauth2.googleapis.com/token",
+                        client_id=_client_id,
+                        client_secret=_client_secret,
+                        scopes=self.SCOPES,
+                    )
+                    creds.refresh(Request())
+                    self.drive_service = build("drive", "v3", credentials=creds)
+                    self._creds = creds
+                    logger.info("✅ Google Drive autenticado con OAuth (variables de entorno)")
+                    return True
+                except Exception as oauth_err:
+                    logger.error(f"❌ OAuth env vars falló: {oauth_err}")
+                    logger.info("⏩ Intentando siguiente método de autenticación...")
+            else:
+                logger.info(f"ℹ️ OAuth env vars no configuradas (client_id={'sí' if _client_id else 'no'}, "
+                            f"secret={'sí' if _client_secret else 'no'}, "
+                            f"refresh={'sí' if _refresh_token else 'no'})")
 
             # --- Método 1: Service Account (credentials.json) --- NO funciona con Google Drive personal
             _creds_path = Path(__file__).parent / "credentials.json"
