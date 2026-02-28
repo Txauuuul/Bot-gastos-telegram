@@ -383,6 +383,10 @@ class SpreadsheetManager:
                 logger.warning("Google Drive no está configurado")
                 return False
 
+            # Crear Excel base si no existe todavía
+            if not os.path.exists(self.LOCAL_FILE):
+                self._crear_excel_base()
+
             # Refrescar token si ha expirado
             self._refrescar_token_si_necesario()
 
