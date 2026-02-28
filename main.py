@@ -6,6 +6,7 @@ Compatible con LOCAL (polling) y NUBE (webhooks).
 
 import logging
 import os
+import subprocess
 import tempfile
 import threading
 import time
@@ -1279,6 +1280,11 @@ def main() -> None:
             webhook_url=f"{WEBHOOK_URL}/{TOKEN}",
         )
     else:
+        try:
+            _commit = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], stderr=subprocess.DEVNULL).decode().strip()
+        except Exception:
+            _commit = "desconocido"
+        logger.info(f"🔖 Versión desplegada: commit {_commit}")
         logger.info("💻 Iniciando en modo LOCAL (polling)")
         logger.info("🤖 Bot iniciado. Presiona Ctrl+C para detener.")
         logger.info(f"📊 Almacenamiento: Excel local + {'Google Drive ☁️' if USE_GOOGLE_DRIVE else 'Local only'}")
