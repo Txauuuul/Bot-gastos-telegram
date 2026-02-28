@@ -138,20 +138,46 @@ class SpreadsheetManager:
     def _init_google_drive(self) -> bool:
         """Inicializa autenticación con Google Drive.
 
-        Soporta dos métodos:
-        1. Service Account (credentials.json con type=service_account) - para Render/nube
-        2. OAuth usuario (token.json) - para uso personal local
+        Soporta tres métodos (por prioridad):
+        0. OAuth env vars (GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET + GOOGLE_REFRESH_TOKEN) - ideal para Render
+        1. Service Account (credentials.json) - solo Shared Drives / tiene limitaciones de cuota
+        2. OAuth usuario (token.json) - uso local con navegador
         """
         try:
             import json as _json
+            from google.oauth2.credentials import Credentials as OAuthCredentials
 
-            # --- Método 1: Service Account (sin navegador, ideal para Render) ---
+            # --- Método 0: OAuth desde variables de entorno (RECOMENDADO para Render) ---
+            _client_id = os.getenv("GOOGLE_CLIENT_ID")
+            _client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
+            _refresh_token = os.getenv("GOOGLE_REFRESH_TOKEN")
+
+            if _client_id and _client_secret and _refresh_token:
+                creds = OAuthCredentials(
+                    token=None,
+                    refresh_token=_refresh_token,
+                    token_uri="https://oauth2.googleapis.com/token",
+                    client_id=_client_id,
+                    client_secret=_client_secret,
+                    scopes=self.SCOPES,
+                )
+                creds.refresh(Request())
+                self.drive_service = build("drive", "v3", credentials=creds)
+                self._creds = creds
+                logger.info("✅ Google Drive autenticado con OAuth (variables de entorno)")
+                return True
+
+            # --- Método 1: Service Account (credentials.json) --- NO funciona con Google Drive personal
             _creds_path = Path(__file__).parent / "credentials.json"
             if _creds_path.exists():
                 with open(_creds_path) as f:
                     cred_data = _json.load(f)
 
                 if cred_data.get("type") == "service_account":
+                    logger.warning("⚠️  Service Account detectado. Los Service Accounts no tienen cuota "
+                                   "de almacenamiento en Google Drive personal. "
+                                   "Configura GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET y GOOGLE_REFRESH_TOKEN en Render.")
+                    # Intentamos igualmente por si el destino es un Shared Drive
                     creds = service_account.Credentials.from_service_account_file(
                         str(_creds_path), scopes=self.SCOPES
                     )
