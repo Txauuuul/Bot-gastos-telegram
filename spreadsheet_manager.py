@@ -170,23 +170,27 @@ class SpreadsheetManager:
                     return True
                 except Exception as oauth_err:
                     logger.error(f"❌ OAuth env vars falló: {oauth_err}")
-                    logger.info("⏩ Intentando siguiente método de autenticación...")
+                    # Si OAuth estaba configurado pero falló, NO usar Service Account (nunca funciona con Drive personal)
+                    self.use_google_drive = False
+                    return False
             else:
                 logger.info(f"ℹ️ OAuth env vars no configuradas (client_id={'sí' if _client_id else 'no'}, "
                             f"secret={'sí' if _client_secret else 'no'}, "
                             f"refresh={'sí' if _refresh_token else 'no'})")
 
-            # --- Método 1: Service Account (credentials.json) --- NO funciona con Google Drive personal
+            # --- Método 1: Service Account (credentials.json) --- SOLO para Shared Drives empresariales
             _creds_path = Path(__file__).parent / "credentials.json"
             if _creds_path.exists():
                 with open(_creds_path) as f:
                     cred_data = _json.load(f)
 
                 if cred_data.get("type") == "service_account":
-                    logger.warning("⚠️  Service Account detectado. Los Service Accounts no tienen cuota "
-                                   "de almacenamiento en Google Drive personal. "
-                                   "Configura GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET y GOOGLE_REFRESH_TOKEN en Render.")
-                    # Intentamos igualmente por si el destino es un Shared Drive
+                    if not GOOGLE_DRIVE_FOLDER_ID:
+                        logger.error("❌ Service Account detectado pero NO funciona con Google Drive personal. "
+                                     "Configura GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET y GOOGLE_REFRESH_TOKEN.")
+                        self.use_google_drive = False
+                        return False
+                    # Solo intentar si hay un Shared Drive folder configurado
                     creds = service_account.Credentials.from_service_account_file(
                         str(_creds_path), scopes=self.SCOPES
                     )
