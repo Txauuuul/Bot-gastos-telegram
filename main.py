@@ -357,9 +357,10 @@ async def categoria_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await query.edit_message_text(text=respuesta)
         
         if not sync_ok:
+            _err = getattr(spreadsheet, "ultimo_error_sync", None) or "Error desconocido"
             await query.message.reply_text(
-                "⚠️ Gasto guardado localmente, pero no se pudo sincronizar con Google Drive.\n"
-                "Se reintentará en la próxima operación."
+                f"⚠️ Gasto guardado localmente, pero no se pudo sincronizar con Google Drive.\n"
+                f"Error: {_err}"
             )
         
         del context.user_data["gasto_pendiente"]
