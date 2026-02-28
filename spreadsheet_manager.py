@@ -345,12 +345,13 @@ class SpreadsheetManager:
             # Refrescar token si ha expirado
             self._refrescar_token_si_necesario()
 
-            query = f"name='{self.LOCAL_FILE}' and trashed=false"
+            _drive_name = Path(self.LOCAL_FILE).name
+            query = f"name='{_drive_name}' and trashed=false"
             results = self.drive_service.files().list(q=query, spaces="drive", pageSize=1).execute()
             files = results.get("files", [])
 
             if not files:
-                logger.info(f"📄 No hay {self.LOCAL_FILE} en Google Drive (primera vez)")
+                logger.info(f"📄 No hay {_drive_name} en Google Drive (primera vez)")
                 return False
 
             file_id = files[0]["id"]
@@ -385,7 +386,8 @@ class SpreadsheetManager:
             # Refrescar token si ha expirado
             self._refrescar_token_si_necesario()
 
-            query = f"name='{self.LOCAL_FILE}' and trashed=false"
+            _drive_name = Path(self.LOCAL_FILE).name
+            query = f"name='{_drive_name}' and trashed=false"
             results = self.drive_service.files().list(q=query, spaces="drive", pageSize=1).execute()
             files = results.get("files", [])
 
@@ -395,7 +397,7 @@ class SpreadsheetManager:
                 self.drive_service.files().update(fileId=file_id, media_body=media).execute()
                 logger.info(f"☁️  Excel sincronizado con Google Drive")
             else:
-                file_metadata = {"name": self.LOCAL_FILE}
+                file_metadata = {"name": _drive_name}
                 # Si hay una carpeta configurada, subir dentro de ella
                 if GOOGLE_DRIVE_FOLDER_ID:
                     file_metadata["parents"] = [GOOGLE_DRIVE_FOLDER_ID]
