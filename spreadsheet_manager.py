@@ -38,10 +38,11 @@ GOOGLE_DRIVE_FOLDER_ID = os.getenv("GOOGLE_DRIVE_FOLDER_ID", None)
 class SpreadsheetManager:
     """Gestiona hojas de cálculo con gastos avanzadas."""
 
-    LOCAL_FILE = "gastos.xlsx"
-    CONFIG_FILE = "config.json"
-    CATEGORIES_FILE = "categorias.json"
-    DELETED_HISTORY_FILE = "historial_borrados.json"
+    _BASE_DIR = Path(__file__).parent
+    LOCAL_FILE = str(_BASE_DIR / "gastos.xlsx")
+    CONFIG_FILE = str(_BASE_DIR / "config.json")
+    CATEGORIES_FILE = str(_BASE_DIR / "categorias.json")
+    DELETED_HISTORY_FILE = str(_BASE_DIR / "historial_borrados.json")
     SCOPES = ["https://www.googleapis.com/auth/drive.file"]
 
     def __init__(self, use_google_drive: bool = False):
@@ -145,13 +146,14 @@ class SpreadsheetManager:
             import json as _json
 
             # --- Método 1: Service Account (sin navegador, ideal para Render) ---
-            if os.path.exists("credentials.json"):
-                with open("credentials.json") as f:
+            _creds_path = Path(__file__).parent / "credentials.json"
+            if _creds_path.exists():
+                with open(_creds_path) as f:
                     cred_data = _json.load(f)
 
                 if cred_data.get("type") == "service_account":
                     creds = service_account.Credentials.from_service_account_file(
-                        "credentials.json", scopes=self.SCOPES
+                        str(_creds_path), scopes=self.SCOPES
                     )
                     self.drive_service = build("drive", "v3", credentials=creds)
                     self._creds = creds
@@ -160,9 +162,10 @@ class SpreadsheetManager:
                     return True
 
             # --- Método 2: OAuth usuario (token.json) ---
+            _token_path = Path(__file__).parent / "token.json"
             creds = None
-            if os.path.exists("token.json"):
-                creds = Credentials.from_authorized_user_file("token.json", self.SCOPES)
+            if _token_path.exists():
+                creds = Credentials.from_authorized_user_file(str(_token_path), self.SCOPES)
 
             if not creds or not creds.valid:
                 if creds and creds.expired and creds.refresh_token:
@@ -174,8 +177,8 @@ class SpreadsheetManager:
                         err_str = str(refresh_error)
                         if "invalid_grant" in err_str or "Token has been expired or revoked" in err_str:
                             logger.error("❌ Google Drive: token revocado. Borra token.json y re-autentícate.")
-                            if os.path.exists("token.json"):
-                                os.remove("token.json")
+                            if _token_path.exists():
+                                _token_path.unlink()
                         else:
                             logger.error(f"❌ Error refrescando token: {refresh_error}")
                         self.use_google_drive = False
@@ -189,7 +192,7 @@ class SpreadsheetManager:
                     return False
 
                 if creds and creds.valid:
-                    with open("token.json", "w") as token:
+                    with open(_token_path, "w") as token:
                         token.write(creds.to_json())
 
             self.drive_service = build("drive", "v3", credentials=creds)
@@ -215,11 +218,12 @@ class SpreadsheetManager:
                             logger.error("❌ Token de Google Drive revocado. Deshabilitando sync.")
                             self.use_google_drive = False
                             self.drive_service = None
-                            if os.path.exists("token.json"):
-                                os.remove("token.json")
+                            _tp = Path(__file__).parent / "token.json"
+                            if _tp.exists():
+                                _tp.unlink()
                             return False
                         raise
-                    with open("token.json", "w") as token:
+                    with open(Path(__file__).parent / "token.json", "w") as token:
                         token.write(self._creds.to_json())
                     self.drive_service = build("drive", "v3", credentials=self._creds)
                     logger.info("✅ Token refrescado y servicio actualizado")
